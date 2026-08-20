@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>装修预算仪表盘</title>
+  <style>
+    :root {
+      --ink: #07111f;
+      --muted: #62738c;
+      --line: rgba(77, 151, 232, .22);
+      --panel: rgba(255, 255, 255, .78);
+      --blue: #0a84ff;
+      --blue-deep: #0757b7;
+      --bg: #f5fbff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #eaf6ff 0%, #f8fcff 42%, #fff 100%);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(10,132,255,.06) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(10,132,255,.05) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(180deg, black 0%, transparent 60%);
+    }
+    main {
+      position: relative;
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 42px 0 56px;
+    }
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(34px, 6vw, 64px);
+      line-height: .96;
+      letter-spacing: 0;
+    }
+    p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.68);
+      color: var(--muted);
+      padding: 10px 14px;
+      font-size: 13px;
+      white-space: nowrap;
+      backdrop-filter: blur(18px);
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: 1.35fr repeat(3, minmax(150px, 1fr));
+      gap: 12px;
+      margin: 20px 0 14px;
+    }
+    .card, section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 24px 70px rgba(14,82,155,.12);
+      backdrop-filter: blur(18px);
+    }
+    .card { padding: 18px; min-height: 112px; }
+    .card.primary {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(10,132,255,.98), rgba(5,87,194,.92));
+      border: 0;
+    }
+    .card span { display: block; color: var(--muted); font-size: 13px; }
+    .card.primary span { color: rgba(255,255,255,.8); }
+    .card strong {
+      display: block;
+      margin-top: 10px;
+      font-size: clamp(24px, 4vw, 40px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+    section { margin-top: 14px; overflow: hidden; }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
+    .hint { color: var(--muted); font-size: 13px; }
+    .bars { display: grid; gap: 12px; padding: 16px 18px 18px; }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr) 116px;
+      gap: 12px;
+      align-items: center;
+      font-size: 13px;
+    }
+    .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+    .track { height: 10px; border-radius: 999px; background: rgba(10,132,255,.10); overflow: hidden; }
+    .fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), rgba(10,132,255,.48)); }
+    .amount { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .todo-layout {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 14px;
+      padding: 18px;
+    }
+    .stack { display: grid; gap: 10px; align-content: start; }
+    .mini {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.66);
+      padding: 14px;
+    }
+    .mini span { display: block; color: var(--muted); font-size: 12px; }
+    .mini strong { display: block; margin-top: 7px; font-size: 24px; letter-spacing: 0; }
+    .todo-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .todo {
+      border: 1px solid rgba(10,132,255,.16);
+      border-radius: 8px;
+      background: rgba(255,255,255,.70);
+      padding: 12px;
+      min-height: 96px;
+    }
+    .todo.done { opacity: .58; background: rgba(255,255,255,.46); }
+    .todo-title { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .todo-title strong { line-height: 1.25; }
+    .todo-amount { color: var(--blue-deep); font-weight: 750; white-space: nowrap; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      border-radius: 999px;
+      border: 1px solid rgba(10,132,255,.13);
+      background: rgba(10,132,255,.07);
+      color: #205d9f;
+      padding: 3px 8px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    footer { margin-top: 18px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 840px) {
+      main { width: min(100% - 20px, 1120px); padding-top: 24px; }
+      header { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .card.primary { grid-column: 1 / -1; }
+      .grid, .todo-layout { grid-template-columns: 1fr; }
+      .todo-list { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 520px) {
+      .metrics { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 78px minmax(0, 1fr) 98px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>装修预算仪表盘</h1>
+        <p>公开分享版：保留预算结构和待买计划，隐藏订单号、店铺和明细备注。</p>
+      </div>
+      <div class="pill">更新：<strong id="updated"></strong></div>
+    </header>
+
+    <div class="metrics">
+      <article class="card primary"><span>实际支出</span><strong id="total"></strong></article>
+      <article class="card"><span>记录数</span><strong id="count"></strong></article>
+      <article class="card"><span>软装可分配</span><strong id="available"></strong></article>
+      <article class="card"><span>Todo 剩余</span><strong id="remaining"></strong></article>
+    </div>
+
+    <div class="grid">
+      <section>
+        <div class="head"><h2>费用大类</h2><span class="hint">按实际支出排序</span></div>
+        <div id="categoryBars" class="bars"></div>
+      </section>
+      <section>
+        <div class="head"><h2>空间分布</h2><span class="hint">按实际支出排序</span></div>
+        <div id="spaceBars" class="bars"></div>
+      </section>
+    </div>
+
+    <section>
+      <div class="head"><h2>购买 Todo</h2><span id="todoHint" class="hint"></span></div>
+      <div class="todo-layout">
+        <div class="stack">
+          <div class="mini"><span>总装修预算</span><strong id="totalBudget"></strong></div>
+          <div class="mini"><span>硬装预留</span><strong id="hardReserve"></strong></div>
+          <div class="mini"><span>Todo 已分配</span><strong id="allocated"></strong></div>
+          <div id="todoSpaceBars" class="bars"></div>
+        </div>
+        <div id="todoList" class="todo-list"></div>
+      </div>
+    </section>
+
+    <footer>数据来自个人装修预算表。此页面为公开分享版，不包含商品链接、订单号和店铺明细。</footer>
+  </main>
+  <script id="budget-data" type="application/json">{"meta": {"total": 157698.23, "count": 70, "updated": "2026-08-20", "totalBudget": 250000.0, "hardReserve": 30000.0, "todoAvailable": 62301.77, "todoAllocated": 61101.77, "todoRemaining": 1200.0, "todoPendingCount": 63}, "categories": [{"name": "施工人工", "amount": 37282.0, "pct": 0.2364135602536566}, {"name": "定制家具", "amount": 35858.4, "pct": 0.22738619196930746}, {"name": "主材", "amount": 32774.0, "pct": 0.20782731676823513}, {"name": "厨卫设备", "amount": 17271.91, "pct": 0.10952507203156306}, {"name": "暖通设备", "amount": 11500.0, "pct": 0.07292409052403441}, {"name": "灯具电气", "amount": 9859.61, "pct": 0.06252200801492826}, {"name": "成品家具", "amount": 7614.71, "pct": 0.04828659142211044}, {"name": "家电", "amount": 5520.0, "pct": 0.03500356345153652}, {"name": "软装装饰", "amount": 17.6, "pct": 0.00011160556462808746}], "spaces": [{"name": "全屋", "amount": 79960.68, "pct": 0.5070486840594215}, {"name": "厨房", "amount": 40200.05, "pct": 0.25491757263223563}, {"name": "卧室", "amount": 11313.7, "pct": 0.07174272025754506}, {"name": "卫生间", "amount": 10927.26, "pct": 0.06929221716692698}, {"name": "阳台", "amount": 5520.0, "pct": 0.03500356345153652}, {"name": "客厅", "amount": 4822.54, "pct": 0.030580812479632773}, {"name": "玄关", "amount": 2540.0, "pct": 0.016106712167917165}, {"name": "餐厅", "amount": 2414.0, "pct": 0.015307717784784267}], "sources": [{"name": "线下/手动", "amount": 123401.0, "pct": 0.782513538674467}, {"name": "淘宝/线上", "amount": 34297.229999999996, "pct": 0.2174864613255329}], "todoRows": [{"space": "玄关", "item": "洞洞板", "category": "软装装饰", "status": "已购买", "budget": 0.0, "priority": "低"}, {"space": "玄关", "item": "入户地垫", "category": "软装装饰", "status": "待购买", "budget": 250.0, "priority": "中"}, {"space": "玄关", "item": "换鞋凳", "category": "成品家具", "status": "待购买", "budget": 750.0, "priority": "中"}, {"space": "玄关", "item": "吊灯", "category": "灯具电气", "status": "部分已购买", "budget": 0.0, "priority": "低"}, {"space": "玄关", "item": "鞋撑子", "category": "软装装饰", "status": "待购买", "budget": 200.0, "priority": "低"}, {"space": "衣帽间", "item": "扫地机器人", "category": "家电", "status": "待购买", "budget": 3000.0, "priority": "高"}, {"space": "衣帽间", "item": "上墙挂衣系统", "category": "定制家具", "status": "待购买", "budget": 1200.0, "priority": "中"}, {"space": "衣帽间", "item": "衣架", "category": "软装装饰", "status": "待购买", "budget": 300.0, "priority": "低"}, {"space": "衣帽间", "item": "洗烘一体机/扫地机器人基座", "category": "成品家具", "status": "待购买", "budget": 600.0, "priority": "中"}, {"space": "衣帽间", "item": "洗烘一体机置物平台", "category": "成品家具", "status": "待购买", "budget": 400.0, "priority": "中"}, {"space": "衣帽间", "item": "灯带", "category": "灯具电气", "status": "待购买", "budget": 300.0, "priority": "低"}, {"space": "衣帽间", "item": "全身镜", "category": "软装装饰", "status": "待购买", "budget": 500.0, "priority": "中"}, {"space": "衣帽间", "item": "地毯", "category": "软装装饰", "status": "待购买", "budget": 200.0, "priority": "低"}, {"space": "衣帽间", "item": "洗烘一体机", "category": "家电", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "衣帽间", "item": "轨道灯", "category": "灯具电气", "status": "已购买", "budget": 0.0, "priority": "中"}, {"space": "厨房", "item": "冰箱", "category": "家电", "status": "待购买", "budget": 4500.0, "priority": "高"}, {"space": "厨房", "item": "抽油烟机", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "厨房", "item": "灶台", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "厨房", "item": "烤箱", "category": "家电", "status": "待购买", "budget": 1800.0, "priority": "中"}, {"space": "厨房", "item": "电饭锅", "category": "家电", "status": "待购买", "budget": 500.0, "priority": "中"}, {"space": "厨房", "item": "洗碗机", "category": "家电", "status": "待购买", "budget": 3000.0, "priority": "高"}, {"space": "厨房", "item": "厨余垃圾处理器", "category": "厨卫设备", "status": "待购买", "budget": 1200.0, "priority": "中"}, {"space": "厨房", "item": "净水器", "category": "厨卫设备", "status": "待购买", "budget": 2000.0, "priority": "高"}, {"space": "厨房", "item": "垃圾桶", "category": "软装装饰", "status": "待购买", "budget": 200.0, "priority": "低"}, {"space": "厨房", "item": "单窗百叶帘", "category": "软装装饰", "status": "待购买", "budget": 400.0, "priority": "中"}, {"space": "厨房", "item": "轨道灯", "category": "灯具电气", "status": "部分已购买", "budget": 0.0, "priority": "低"}, {"space": "厨房", "item": "空气炸锅", "category": "家电", "status": "待购买", "budget": 700.0, "priority": "低"}, {"space": "客餐厅", "item": "餐桌", "category": "成品家具", "status": "待购买", "budget": 2800.0, "priority": "高"}, {"space": "客餐厅", "item": "餐椅1", "category": "成品家具", "status": "待购买", "budget": 600.0, "priority": "中"}, {"space": "客餐厅", "item": "餐椅2", "category": "成品家具", "status": "待购买", "budget": 600.0, "priority": "中"}, {"space": "客餐厅", "item": "餐椅3", "category": "成品家具", "status": "待购买", "budget": 600.0, "priority": "中"}, {"space": "客餐厅", "item": "餐椅4", "category": "成品家具", "status": "待购买", "budget": 600.0, "priority": "中"}, {"space": "客餐厅", "item": "餐边/咖啡柜", "category": "成品家具", "status": "待购买", "budget": 1800.0, "priority": "中"}, {"space": "客餐厅", "item": "咖啡机", "category": "家电", "status": "待购买", "budget": 1000.0, "priority": "中"}, {"space": "客餐厅", "item": "双人沙发", "category": "成品家具", "status": "待购买", "budget": 3500.0, "priority": "高"}, {"space": "客餐厅", "item": "单人沙发", "category": "成品家具", "status": "待购买", "budget": 1200.0, "priority": "中"}, {"space": "客餐厅", "item": "茶几", "category": "成品家具", "status": "待购买", "budget": 900.0, "priority": "中"}, {"space": "客餐厅", "item": "边几", "category": "成品家具", "status": "待购买", "budget": 500.0, "priority": "低"}, {"space": "客餐厅", "item": "上墙书架系统", "category": "定制家具", "status": "待购买", "budget": 1800.0, "priority": "中"}, {"space": "客餐厅", "item": "HomePod*2", "category": "家电", "status": "待购买", "budget": 1500.0, "priority": "中"}, {"space": "客餐厅", "item": "投影仪", "category": "家电", "status": "待购买", "budget": 1800.0, "priority": "中"}, {"space": "客餐厅", "item": "落地灯", "category": "灯具电气", "status": "待购买", "budget": 700.0, "priority": "低"}, {"space": "客餐厅", "item": "地毯1", "category": "软装装饰", "status": "待购买", "budget": 900.0, "priority": "中"}, {"space": "客餐厅", "item": "地毯2", "category": "软装装饰", "status": "待购买", "budget": 600.0, "priority": "低"}, {"space": "客餐厅", "item": "罗马帘", "category": "软装装饰", "status": "待购买", "budget": 700.0, "priority": "中"}, {"space": "客餐厅", "item": "客厅灯", "category": "灯具电气", "status": "已购买", "budget": 0.0, "priority": "中"}, {"space": "客餐厅", "item": "餐厅灯", "category": "灯具电气", "status": "已购买", "budget": 0.0, "priority": "中"}, {"space": "书房", "item": "办公桌", "category": "成品家具", "status": "待购买", "budget": 1500.0, "priority": "高"}, {"space": "书房", "item": "办公椅", "category": "成品家具", "status": "待购买", "budget": 1200.0, "priority": "高"}, {"space": "书房", "item": "阅读灯", "category": "灯具电气", "status": "待购买", "budget": 400.0, "priority": "中"}, {"space": "书房", "item": "唱片边柜", "category": "成品家具", "status": "待购买", "budget": 900.0, "priority": "低"}, {"space": "书房", "item": "唱片机", "category": "家电", "status": "待购买", "budget": 800.0, "priority": "低"}, {"space": "书房", "item": "音响", "category": "家电", "status": "待购买", "budget": 1800.0, "priority": "中"}, {"space": "书房", "item": "落地灯", "category": "灯具电气", "status": "待购买", "budget": 600.0, "priority": "低"}, {"space": "书房", "item": "隔断帘", "category": "软装装饰", "status": "待购买", "budget": 600.0, "priority": "中"}, {"space": "书房", "item": "蒲团", "category": "软装装饰", "status": "待购买", "budget": 200.0, "priority": "低"}, {"space": "书房", "item": "榻榻米", "category": "定制家具", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "书房", "item": "日夜蜂巢帘", "category": "软装装饰", "status": "待购买", "budget": 600.0, "priority": "中"}, {"space": "浴室", "item": "镜子", "category": "厨卫设备", "status": "待购买", "budget": 500.0, "priority": "中"}, {"space": "浴室", "item": "镜前灯", "category": "灯具电气", "status": "待购买", "budget": 300.0, "priority": "中"}, {"space": "浴室", "item": "（单换）门锁", "category": "主材", "status": "待购买", "budget": 250.0, "priority": "低"}, {"space": "浴室", "item": "岩点", "category": "主材", "status": "待购买", "budget": 500.0, "priority": "低"}, {"space": "浴室", "item": "地垫", "category": "软装装饰", "status": "已购买", "budget": 0.0, "priority": "低"}, {"space": "浴室", "item": "壁龛", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "中"}, {"space": "浴室", "item": "淋浴系统", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "浴室", "item": "马桶", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "浴室", "item": "干区顶灯", "category": "灯具电气", "status": "待购买", "budget": 250.0, "priority": "低"}, {"space": "浴室", "item": "换气扇", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "中"}, {"space": "浴室", "item": "马桶间晴空灯", "category": "灯具电气", "status": "已购买", "budget": 0.0, "priority": "中"}, {"space": "浴室", "item": "浴霸", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "浴室", "item": "台盆", "category": "厨卫设备", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "卧室", "item": "斗柜", "category": "成品家具", "status": "待购买", "budget": 1300.0, "priority": "中"}, {"space": "卧室", "item": "落地灯", "category": "灯具电气", "status": "待购买", "budget": 600.0, "priority": "低"}, {"space": "卧室", "item": "床品", "category": "软装装饰", "status": "待购买", "budget": 900.0, "priority": "中"}, {"space": "卧室", "item": "床头柜", "category": "成品家具", "status": "待购买", "budget": 900.0, "priority": "中"}, {"space": "卧室", "item": "床头灯", "category": "灯具电气", "status": "部分已购买", "budget": 201.77, "priority": "低"}, {"space": "卧室", "item": "地毯", "category": "软装装饰", "status": "待购买", "budget": 800.0, "priority": "中"}, {"space": "卧室", "item": "吊灯", "category": "灯具电气", "status": "部分已购买", "budget": 800.0, "priority": "低"}, {"space": "卧室", "item": "床垫", "category": "成品家具", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "卧室", "item": "床", "category": "成品家具", "status": "已购买", "budget": 0.0, "priority": "高"}, {"space": "卧室", "item": "罗马帘", "category": "软装装饰", "status": "待购买", "budget": 1100.0, "priority": "中"}], "todoSpaces": [{"name": "客餐厅", "amount": 22100.0, "pct": 0.361691649849096}, {"name": "厨房", "amount": 14300.0, "pct": 0.23403577343176804}, {"name": "书房", "amount": 8600.0, "pct": 0.14074878681910524}, {"name": "卧室", "amount": 6601.77, "pct": 0.10804547887892611}, {"name": "衣帽间", "amount": 6500.0, "pct": 0.10637989701444002}, {"name": "浴室", "amount": 1800.0, "pct": 0.029459048403998774}, {"name": "玄关", "amount": 1200.0, "pct": 0.01963936560266585}]}</script>
+  <script>
+    const data = JSON.parse(document.getElementById('budget-data').textContent);
+    const money = value => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value || 0);
+    const pct = value => `${(value * 100).toFixed(1)}%`;
+    document.getElementById('updated').textContent = data.meta.updated;
+    document.getElementById('total').textContent = money(data.meta.total);
+    document.getElementById('count').textContent = `${data.meta.count} 笔`;
+    document.getElementById('available').textContent = money(data.meta.todoAvailable);
+    document.getElementById('remaining').textContent = money(data.meta.todoRemaining);
+    document.getElementById('totalBudget').textContent = money(data.meta.totalBudget);
+    document.getElementById('hardReserve').textContent = money(data.meta.hardReserve);
+    document.getElementById('allocated').textContent = money(data.meta.todoAllocated);
+    document.getElementById('todoHint').textContent = `${data.meta.todoPendingCount} 项待买`;
+
+    function bars(target, items) {
+      const max = Math.max(...items.map(item => item.amount), 1);
+      document.getElementById(target).innerHTML = items.map(item => `
+        <div class="bar-row">
+          <div class="name" title="${item.name}">${item.name}</div>
+          <div class="track"><div class="fill" style="width:${Math.max(1, item.amount / max * 100)}%"></div></div>
+          <div class="amount">${money(item.amount)} · ${pct(item.pct)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderTodo() {
+      bars('todoSpaceBars', data.todoSpaces);
+      const priorityRank = { '高': 0, '中': 1, '低': 2 };
+      const statusRank = { '待购买': 0, '部分已购买': 1, '已购买': 2 };
+      const rows = [...data.todoRows].sort((a, b) =>
+        (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+        || (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
+        || b.budget - a.budget
+      );
+      document.getElementById('todoList').innerHTML = rows.map(row => `
+        <article class="todo ${row.status === '已购买' ? 'done' : ''}">
+          <div class="todo-title">
+            <strong>${row.item}</strong>
+            <span class="todo-amount">${row.budget ? money(row.budget) : '已购买'}</span>
+          </div>
+          <div class="tags">
+            <span class="tag">${row.space}</span>
+            <span class="tag">${row.category}</span>
+            <span class="tag">${row.status}</span>
+            <span class="tag">优先级${row.priority}</span>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    bars('categoryBars', data.categories);
+    bars('spaceBars', data.spaces);
+    renderTodo();
+  </script>
+</body>
+</html>
