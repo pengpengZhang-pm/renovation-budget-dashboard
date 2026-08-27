@@ -159,6 +159,28 @@
     .mini span { display: block; color: var(--muted); font-size: 12px; }
     .mini strong { display: block; margin-top: 7px; font-size: 21px; letter-spacing: 0; }
     .todo-list { display: block; }
+    .todo-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.1fr auto;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .todo-controls select, .todo-controls button {
+      width: 100%;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.82);
+      color: var(--ink);
+      padding: 0 12px;
+      font: inherit;
+      font-size: 13px;
+    }
+    .todo-controls button {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--blue-deep);
+    }
     .todo-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -188,6 +210,23 @@
     .todo-title { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
     .todo-title strong { line-height: 1.25; font-size: 14px; }
     .todo-amount { color: var(--blue-deep); font-weight: 750; white-space: nowrap; }
+    .todo-budget {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .todo-budget input {
+      height: 30px;
+      border-radius: 8px;
+      padding: 0 8px;
+      text-align: right;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
     .tags { display: flex; flex-wrap: wrap; gap: 5px; }
     .tag {
       border-radius: 999px;
@@ -279,6 +318,7 @@
       .card.primary { grid-column: 1 / -1; }
       .grid, .todo-layout { grid-template-columns: 1fr; }
       .todo-grid { grid-template-columns: 1fr; }
+      .todo-controls { grid-template-columns: 1fr 1fr; }
       .cashback-grid { grid-template-columns: 1fr; }
       .toolbar { grid-template-columns: 1fr 1fr; }
       .toolbar input { grid-column: 1 / -1; }
@@ -288,6 +328,7 @@
       .metrics { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: 78px minmax(0, 1fr) 98px; }
       .toolbar { grid-template-columns: 1fr; }
+      .todo-controls { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -342,7 +383,19 @@
             <div class="mini"><span>Todo 已分配</span><strong id="allocated"></strong></div>
             <div id="todoSpaceBars" class="bars"></div>
           </div>
-          <div id="todoList" class="todo-list"></div>
+          <div class="todo-list">
+            <div class="todo-controls">
+              <select id="todoSpaceFilter"><option value="">全部空间</option></select>
+              <select id="todoCategoryFilter"><option value="">全部分类</option></select>
+              <select id="todoSort">
+                <option value="default">默认排序</option>
+                <option value="budgetDesc">预算从高到低</option>
+                <option value="budgetAsc">预算从低到高</option>
+              </select>
+              <button id="todoReset" type="button">重置</button>
+            </div>
+            <div id="todoList"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -398,13 +451,34 @@
     document.getElementById('updated').textContent = data.meta.updated;
     document.getElementById('total').textContent = money(data.meta.total);
     document.getElementById('count').textContent = `${data.meta.count} 笔`;
-    document.getElementById('available').textContent = money(data.meta.todoAvailable);
-    document.getElementById('remaining').textContent = money(data.meta.todoRemaining);
     document.getElementById('totalBudget').textContent = money(data.meta.totalBudget);
     document.getElementById('hardReserve').textContent = money(data.meta.hardReserve);
-    document.getElementById('allocated').textContent = money(data.meta.todoAllocated);
-    document.getElementById('todoHint').textContent = `${data.meta.todoPendingCount} 项待买`;
     document.getElementById('cashbackHint').textContent = `${data.meta.cashbackCount} 项 · 预计 ${money(data.meta.cashbackTotal)}`;
+
+    data.todoRows.forEach((row, index) => row.id = `${row.space}::${row.item}::${index}`);
+    const TODO_BUDGET_KEY = 'renovationTodoBudgetEdits:v1';
+    const budgetEdits = JSON.parse(localStorage.getItem(TODO_BUDGET_KEY) || '{}');
+    data.todoRows.forEach(row => {
+      if (Object.prototype.hasOwnProperty.call(budgetEdits, row.id)) {
+        const edited = Number(budgetEdits[row.id]);
+        if (Number.isFinite(edited)) row.budget = edited;
+      }
+    });
+
+    function todoStats() {
+      const allocated = data.todoRows.reduce((sum, row) => sum + Number(row.budget || 0), 0);
+      const remaining = data.meta.todoAvailable - allocated;
+      const pending = data.todoRows.filter(row => row.status !== '已购买').length;
+      return { allocated, remaining, pending };
+    }
+
+    function renderTodoStats() {
+      const stats = todoStats();
+      document.getElementById('available').textContent = money(data.meta.todoAvailable);
+      document.getElementById('remaining').textContent = money(stats.remaining);
+      document.getElementById('allocated').textContent = money(stats.allocated);
+      document.getElementById('todoHint').textContent = `${stats.pending} 项待买 · 预算差额 ${money(stats.remaining)}`;
+    }
 
     function bars(target, items) {
       const max = Math.max(...items.map(item => item.amount), 1);
@@ -417,15 +491,33 @@
       `).join('');
     }
 
+    function renderTodoSpaceBars() {
+      const totals = new Map();
+      data.todoRows
+        .filter(row => row.status !== '已购买')
+        .forEach(row => totals.set(row.space, (totals.get(row.space) || 0) + Number(row.budget || 0)));
+      const allocated = todoStats().allocated;
+      const items = [...totals.entries()]
+        .map(([name, amount]) => ({ name, amount, pct: allocated ? amount / allocated : 0 }))
+        .sort((a, b) => b.amount - a.amount);
+      bars('todoSpaceBars', items);
+    }
+
     function renderTodo() {
-      bars('todoSpaceBars', data.todoSpaces);
+      renderTodoStats();
+      renderTodoSpaceBars();
       const priorityRank = { '高': 0, '中': 1, '低': 2 };
       const statusRank = { '待购买': 0, '部分已购买': 1, '已购买': 2 };
-      const rows = [...data.todoRows].sort((a, b) =>
-        (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
-        || (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
-        || b.budget - a.budget
-      );
+      const rows = [...data.todoRows]
+        .filter(row => !todoSpaceFilter.value || row.space === todoSpaceFilter.value)
+        .filter(row => !todoCategoryFilter.value || row.category === todoCategoryFilter.value)
+        .sort((a, b) => {
+          if (todoSort.value === 'budgetDesc') return b.budget - a.budget;
+          if (todoSort.value === 'budgetAsc') return a.budget - b.budget;
+          return (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+            || (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
+            || b.budget - a.budget;
+        });
       const activeRows = rows.filter(row => row.status !== '已购买');
       const doneRows = rows.filter(row => row.status === '已购买');
       const card = row => `
@@ -440,6 +532,10 @@
             <span class="tag">${row.status}</span>
             <span class="tag">优先级${row.priority}</span>
           </div>
+          <label class="todo-budget">
+            <span>预算</span>
+            <input class="todo-budget-input" data-id="${row.id}" type="number" min="0" step="1" value="${row.budget || 0}" />
+          </label>
         </article>
       `;
       document.getElementById('todoList').innerHTML = `
@@ -471,6 +567,10 @@
     const search = document.getElementById('search');
     const categoryFilter = document.getElementById('categoryFilter');
     const spaceFilter = document.getElementById('spaceFilter');
+    const todoSpaceFilter = document.getElementById('todoSpaceFilter');
+    const todoCategoryFilter = document.getElementById('todoCategoryFilter');
+    const todoSort = document.getElementById('todoSort');
+    const todoReset = document.getElementById('todoReset');
     const tbody = document.getElementById('rows');
     const empty = document.getElementById('empty');
     const resultCount = document.getElementById('resultCount');
@@ -486,6 +586,31 @@
 
     optionList(categoryFilter, [...new Set(data.rows.map(row => row.category))].sort());
     optionList(spaceFilter, [...new Set(data.rows.map(row => row.space))].sort());
+    optionList(todoSpaceFilter, [...new Set(data.todoRows.map(row => row.space))].filter(Boolean).sort());
+    optionList(todoCategoryFilter, [...new Set(data.todoRows.map(row => row.category))].filter(Boolean).sort());
+
+    for (const control of [todoSpaceFilter, todoCategoryFilter, todoSort]) {
+      control.addEventListener('change', renderTodo);
+    }
+
+    todoReset.addEventListener('click', () => {
+      todoSpaceFilter.value = '';
+      todoCategoryFilter.value = '';
+      todoSort.value = 'default';
+      renderTodo();
+    });
+
+    document.getElementById('todoList').addEventListener('change', event => {
+      const input = event.target.closest('.todo-budget-input');
+      if (!input) return;
+      const row = data.todoRows.find(item => item.id === input.dataset.id);
+      if (!row) return;
+      const value = Math.max(0, Number(input.value || 0));
+      row.budget = Number.isFinite(value) ? value : 0;
+      budgetEdits[row.id] = row.budget;
+      localStorage.setItem(TODO_BUDGET_KEY, JSON.stringify(budgetEdits));
+      renderTodo();
+    });
 
     function renderRows() {
       const query = search.value.trim().toLowerCase();
